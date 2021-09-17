@@ -1,0 +1,489 @@
+---
+title: "Master en Big Data. Fundamentos Matemáticos del Análisis de Datos (FMAD)."
+author: "Ana Blasi Sanchiz"
+date: 'Curso 2021-22. Última actualización: `r format(Sys.time(), "%Y-%m-%d")`'
+output:
+  html_document: default
+  pdf_document: default
+subtitle: Tarea 1
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Instrucciones preliminares
+
++ Empieza abriendo el proyecto de RStudio correspondiente a tu repositorio personal de la asignatura. 
+
++ En todas las tareas tendrás que repetir un proceso como el descrito en la sección *Repite los pasos Creando un fichero Rmarkdown para esta práctica* de la *Práctica00*. Puedes releer la sección *Practicando la entrega de las Tareas* de esa misma práctica para recordar el procedimiento de entrega.
+
+# PRACTICA 0
+
++ Si no has hecho los *Ejercicios* de la *Práctica00* (págs. 12 y 13) hazlos ahora y añádelos a esta tarea. Si ya los has hecho y entregado a través de GitHub no hace falta que hagas nada.
+
+### Ejercicio 0.1
+
++ Usando la función sample crea un vector dado_honesto con 100 números del 1 al 6. Haz una tabla de frecuencias absolutas (de dos maneras, con table y dplyr) y una tabla de frecuencias relativas.
+
+Prerequisitos:
+```{r}
+library(dbplyr)
+library(tidyverse)
+```
+
+Vector dado honesto
+```{r}
+dado_honesto = sample(1:6,100,replace = TRUE)
+```
+
+Frecuencia absoluta
+```{r}
+table(dado_honesto)
+```
+
+```{r}
+tabla <- as.data.frame(dado_honesto)
+```
+
+Frecuencia absoluta utilizando la librería dplyr
+```{r}
+tabla %>% 
+  count(dado_honesto)
+```
+
+Frecuencia relativa
+```{r}
+signif(prop.table(table(dado_honesto)), 2)
+```
+
+Frecuencia relativa utilizando la librería dplyr
+```{r}
+tabla %>% 
+    count(dado_honesto) %>%
+    mutate(dado_honesto, relFreq = prop.table(n), n=NULL) 
+```
+
+### Ejercicio 0.2 
+
++ A continuación crea un nuevo vector dado_cargado de manera que la probabilidad de que el número elegido valga 6 sea el doble que la probabilidad de elegir cualquiera de los cinco números restantes. Lee la ayuda de sample si lo necesitas. De nuevo, haz tablas de frecuencias absolutas y relativas de este segundo vector.
+
+Vector dado cargo
+```{r}
+dado_cargo = sample(1:6,100,replace = TRUE,prob= c(1/7, 1/7, 1/7, 1/7, 1/7, 2/7))
+```
+
+Frecuencia absoluta
+```{r}
+table(dado_cargo)
+```
+
+```{r}
+tabla <- as.data.frame(dado_cargo)
+```
+
+Frecuencia absoluta utilizando la librería dplyr
+```{r}
+tabla %>% 
+  count(dado_cargo)
+```
+
+Frecuencia relativa
+```{r}
+signif(prop.table(table(dado_cargo)), 2)
+```
+
+Frecuencia relativa utilizando la librería dplyr
+```{r}
+tabla %>% 
+    count(dado_cargo) %>%
+    mutate(dado_cargo, relFreq = prop.table(n), n=NULL) 
+```
+
+### Ejercicio 0.3
+
++ Utiliza las funciones rep y seq para crear tres vectores v1, v2 y v3 con estos elementos respectivamente:
+
+```{r}
+(v1 <- rep(seq(4,1),each=3))
+(v2 <- rep(seq(1,5), times = c(1,2,3,4,5)))
+(v3 <- rep(seq(1,4), times = 4))
+```
+
+### Ejercicio 0.4
+
++ Utilizando la tabla mpg de la librería tidyverse crea una tabla mpg2 que:contenga las filas en las que la variable class toma el valor pickup y las columnas de la tabla original cuyos nombres empiezan por c. No se trata de que las selecciones a mano, por sus nombres.
+
+```{r}
+(mpg2 <- mpg %>% 
+   filter(mpg$class == 'pickup') %>% 
+    select(starts_with('c')))
+```
+
+### Ejercicio 0.5 
+
++ Descarga el fichero census.dta. Averigua de qué tipo de fichero se trata y usa la herramienta Import DataSet del panel Environment de RStudio para leer con R los datos de ese fichero. Asegúrate de copiar en esta práctica los dos primeros comandos que llevan a cabo la importación (excluye el comando View) y que descubrirás al usar esa herramienta. Después completa los siguientes apartados con esos datos y usando dplyr y ggplot:
+
+Prerequisitos:
+```{r}
+library(ggplot2)
+library(haven)
+```
+
+Poblaciones totales de las regiones censales
+```{r}
+census = read_dta(file = "./data/census.dta")
+(poblaciones <- census %>% 
+  group_by(region) %>% 
+  summarise(pop = sum(pop)))
+```
+
+Diagrama de las poblaciones totales según las diferentes regiones censales
+```{r}
+ggplot(data = poblaciones) +
+  geom_col(mapping = aes(x = region, y = pop),color="black",fill = "peachpuff")
+```
+
+Estados ordenados según la población
+```{r}
+census %>% 
+  select(state,pop) %>% 
+  arrange(desc(pop))
+```
+
+La tabla census con una nueva variable llamada tasa
+```{r}
+census %>% 
+  mutate(tasa=divorce/marriage)
+```
+
+10 primeros valores de la tabla donde se observa los estados más envejecidos
+```{r}
+(tabla <- census %>% 
+  select(state,medage) %>% 
+  mutate(prop=(census$pop65p)/(census$pop)) %>% 
+  arrange(desc(medage)) %>% 
+  head(10))
+```
+ 
+Histograma con los valores de la variable medage y con la curva de densidad de la variable superpuesta
+```{r}
+cortes <- seq(min(census$medage), max(census$medage), length.out=11)
+ggplot(data=census, aes(x = medage)) + geom_histogram(aes(y=stat(density)), breaks = cortes, fill = "peachpuff", color="black") + geom_density(color="red")
+```
+
+# TAREA 1
+
+## Ejercicio 1. Análisis exploratorio de un conjunto de datos y operaciones con dplyr. 
+
++ Vamos a utilizar el conjunto de datos contenido en el fichero (es un enlace):  
+[cholesterol.csv](https://gist.githubusercontent.com/fsansegundo/ee991e53e1a571dd34034c42b5516eae/raw/2206455b5772e90c5a2a24a3f42a84408fd1d1c5/cholesterol.csv)  
+Los datos proceden de un estudio realizado en la *University of Virginia School of Medicine* que investiga la prevalencia de la obesidad, la diabetes y otros factores de riesgo cardiovascular. Se puede encontrar más información sobre el fichero en este enlace:  
+[https://biostat.app.vumc.org/wiki/pub/Main/DataSets/diabetes.html](https://biostat.app.vumc.org/wiki/pub/Main/DataSets/diabetes.html)  
+
++ Carga el conjunto de datos en un data.frame de R llamado `chlstrl`.
+```{r echo=FALSE, comment=NULL}
+chlstrl <- read_csv("./data/cholesterol.csv")
+```
+
+
++ Empezaremos por información básica sobre el conjunto de datos. Cuántas observaciones contiene, cuáles son las variables y de qué tipos,...
+```{r}
+str(chlstrl)
+```
+
++ Asegúrate de comprobar si hay datos ausentes y localízalos en la tabla.
+```{r}
+#Numero de datos ausentes
+sum(is.na(chlstrl))
+#Localización de los datos ausentes
+apply(is.na(chlstrl),2, which)
+```
+
++ El análisis exploratorio (numérico y gráfico) debe cubrir todos los tipos de variable de la tabla. Es decir, que al menos debes estudiar una variable por cada tipo de variable presente en la tabla. El análisis debe contener, al menos:
+  - Para las variables cuantitativas (continuas o discretas).  
+    Resumen numérico básico.  
+    Gráficas (las adecuadas, a ser posible más de un tipo de gráfico).  
+  - Variables categóricas (factores).  
+    Tablas de frecuencia (absolutas y relativas).  
+    Gráficas (diagrama de barras).  
+
+Tipo de variable de la tabla
+```{r}
+chlstrl %>% 
+  sapply(class)
+```
+
++ Infromación sobre variables cuantitativas
+
+Estudio sobre cada tipo de variable que hay en la tabla
+```{r}
+summary(chlstrl)
+```
+
+Histograma de densidad de los datos de cholesterol
+```{r}
+cortes = seq(min(chlstrl$chol, na.rm = TRUE),max(chlstrl$chol, na.rm = TRUE),length.out = 16)
+ggplot(data = chlstrl, mapping = aes(chol)) +
+  geom_histogram(aes(y = stat(density)), breaks = cortes, fill = "peachpuff", color = "black") +
+  geom_density(color = "red")
+```
+
+Boxpolt de los datos del cholesterol
+```{r}
+ggplot(data = chlstrl) + 
+  scale_x_discrete(breaks = c()) +
+  geom_boxplot(mapping = aes(y = chol), fill = "peachpuff")
+```
+
+Histograma de frecuencia de los datos de edad
+```{r}
+edad <- chlstrl$age
+hist(edad, col= 'peachpuff',main ='Histograma de frecuencia de los datos de edad')
+```
+
+Histograma de frecuencia de los datos de altura
+```{r}
+altura <- chlstrl$height*0.0254
+hist(altura, col= 'peachpuff',main="Histograma de frecuencia de los datos de altura")
+```
+
+Histograma de densidad de los datos de peso
+```{r}
+peso <- chlstrl$weight*0.454
+hist(peso, col= 'peachpuff',main="Histograma de frecuencia de los datos de peso")
+```
+
+Boxplot de los datos de medidas de cintura
+```{r}
+ggplot(data = chlstrl) + 
+  scale_x_discrete(breaks = c()) +
+  geom_boxplot(mapping = aes(y = waist), fill = "peachpuff")
+```
+
+Boxplot de los datos de medidas de cadera
+```{r}
+ggplot(data = chlstrl) + 
+  scale_x_discrete(breaks = c()) +
+  geom_boxplot(mapping = aes(y = hip), fill = "peachpuff")
+```
+
++Información sobre el variables categóricas
+
+```{r}
+chlstrl$gender = factor(chlstrl$gender)
+```
+
+Tabla de frecuencias absolutas según el genero
+```{r}
+chlstrl %>% 
+  count(gender)
+```
+
+Tabla de frecuencias relativas según genero
+```{r}
+chlstrl %>% 
+    count(gender) %>%
+    mutate(gender, relFreq = prop.table(n), n=NULL) 
+```
+
+Gráfica del colesterol según el genero
+```{r}
+ggplot(chlstrl) +
+  geom_bar(mapping = aes(x = gender), fill=c("red","blue"))
+```
+
+
++ Los valores de `height` y `weight` están en pulgadas (inches) y libras (pounds) respectivamente. Una libra son $\approx$ 0.454kg y una pulgada son $\approx$ 0.0254m.  Usa dplyr para convertir esas columnas a metros y kilogramos respectivamente.  Las nuevas columnas deben llamarse igual que las originales. 
+
+```{r}
+chlstrl %>% 
+  mutate(height=height*0.0254,weight=weight*0.454)
+```
++ Ahora usa esos valores de `height` y `weight` para añadir una nueva columna llamada BMI, definida mediante:
+$$BMI = \dfrac{weight}{height^2}$$
+(se divide por el cuadrado de la altura). 
+
+```{r}
+(chlstrl <- chlstrl %>% 
+  mutate(BMI=weight/height^2))
+```
+
++ Crea una nueva columna llamada `ageGroup` dividiendo la edad en los siguientes tres niveles:
+ 
+```{r echo=FALSE, comment=NULL}
+cat("(10,40], (40,70], (70,100]")
+```
+
+```{r}
+(chlstrl <- chlstrl %>% 
+  mutate(ageGroup = cut(age,breaks = c(10,40,70,100))))
+```
+
++ Usando `dplyr` calcula cuántas observaciones hay en cada nivel de `ageGroup` (indicación: usa `group_by`). Ahora, usando aquellas observaciones que corresponden a mujeres, ¿cuál es la media del nivel de colesterol y de BMI en cada uno de esos grupos de edad?
+
+```{r}
+chlstrl %>% 
+  group_by(ageGroup) %>% 
+  filter(gender == "female") %>% 
+  summarise(mediaColesterol = mean(chol,na.rm=TRUE),mediaBMI = mean(BMI,na.rm=TRUE))
+```
+
+
+## Ejercicio 2: Funciones de R.
+
++ Crea una función de R llamada `cambiosSigno` que dado un vector `x` de números enteros no nulos, como el siguiente vector:
+    ```{r echo=FALSE, comment=NULL}
+    set.seed(2019)
+    x = sample(c(-1, 1), 9, replace = TRUE) * sample(1:20, 9, replace = TRUE)
+    cat(paste0(x, sep=", "))
+    ```
+    
++ Calcule cuántos cambios de signo ha habido. Es decir, cuántas veces el signo de un elemento es distinto del signo del elemento previo. Por ejemplo, en el vector anterior hay 4 cambios de signo (en las posiciones 3, 4, 7 y 8). 
+  
+```{r}
+cambiosSigno <- function(x,index=0){
+  for (i in 2:length(x)){
+    if (x[i]*x[i-1]<0) {
+      index=index+1
+    }
+  }
+  return(index)
+}
+cambiosSigno(x)
+```
+
+  
++ Modifica la función para que devuelva como resultado las posiciones donde hay cambios de signo. Llama `cambiosSignoPos(x)` a esa otra función. Por ejemplo, para el vector anterior el resultado de esta función sería
+    ```{r echo=FALSE, results='asis'}
+    cat("[1] 3 4 7 8")
+    ```
+    
+```{r}
+cambiosSignoPos <- function(x,cambioSig=c()){
+  for (i in 2:length(x)){
+    if (x[i]*x[i-1]<0) {
+      cambioSig = append(cambioSig,i)
+    }
+  }
+  return(cambioSig)
+}
+cambiosSignoPos(x)
+```
+
++ También se valorará que incluyas en el código como usar `sample` para generar vectores aleatorios de 20 enteros *no nulos* (el vector debe poder tomar valores positivos y negativos).
+
+```{r}
+(vector=sample(c(-10:-1,1:10),20,replace=TRUE))
+cambiosSigno(x=vector)
+cambiosSignoPos(x=vector)
+```
+
+
+## Ejercicio 3. R4DS.
+
+Es recomendable que esta semana del curso  hagas al menos una lectura somera de los Capítulos 1 a 5 de [R for Data Science (R4DS), de H. Wickham](https://r4ds.had.co.nz/index.html), con énfasis especial en los Capítulos 3 y 5 (los capítulos 1, 2 y 4 son muy breves). Los siguientes apartados pretenden motivar esa lectura y por eso mismo pueden resultar un poco más laboriosos.  
+
++ Haz el [ejercicio 6 de la Sección 3.6.1 de R4DS](https://r4ds.had.co.nz/data-visualisation.html#exercises-3).
+
+Prerequisitos:
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
++ Recreate the R code necessary to generate the following graphs.
+
+Gráfica 1
+```{r}
+(graph1 <- ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point(size=4) + 
+  geom_smooth(fill = NA,size=2))
+```
+
+Gráfica 2
+```{r}
+(graph2 <- ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point(size=4) + 
+  geom_smooth(mapping = aes(group=drv),fill = NA,size=2))
+```
+
+Gráfica 3
+```{r}
+(graph3 <- ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point(mapping = aes(color = drv), size=4) + 
+  geom_smooth(mapping = aes(color=drv),fill = NA,size=2))
+```
+
+Gráfica 4
+```{r}
+(graph4 <- ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point(mapping = aes(color = drv), size=4) + 
+  geom_smooth(fill = NA,size=2))
+```
+
+Gráfica 5
+```{r}
+(graph5 <- ggplot(data = mpg, mapping = aes(x = displ, y = hwy)) + 
+  geom_point(mapping = aes(color = drv), size=4) + 
+  geom_smooth(mapping = aes(group=drv,linetype = drv),fill = NA,size=2))
+```
+
+Gráfica 6
+```{r}
+(graph6 <- ggplot(data = mpg, mapping = aes(x = displ, y = hwy, color = drv, size=3)) + 
+  geom_point(mapping = aes(fill = drv), size=4, shape=21, col = "white", stroke = 2))  
+```
+
+
++ Haz el [ejercicio 1 de la Sección 5.2.4 de R4DS](https://r4ds.had.co.nz/transform.html#exercises-8). 
+Prerequisitos
+```{r}
+library(nycflights13)
+```
+
+### Find all flights that:
+
+1. Had an arrival delay of two or more hours
+```{r}
+flights %>% 
+  filter(dep_delay>=120)
+```
+
+2. Flew to Houston (IAH or HOU)
+```{r}
+flights %>% 
+  filter(dest=='IAH'|dest=='HOU')
+```
+
+3. Were operated by United, American, or Delta
+```{r}
+flights %>% 
+  filter(carrier=='UA'|carrier=='DL'|carrier=='AA')
+```
+
+4. Departed in summer (July, August, and September)
+```{r}
+flights %>% 
+  filter(month==7|month==8|month==9)
+```
+
+5. Arrived more than two hours late, but didn’t leave late
+```{r}
+flights %>% 
+  filter(dep_time==sched_dep_time|arr_delay>120)
+```
+
+6. Were delayed by at least an hour, but made up over 30 minutes in flight
+```{r}
+flights %>% 
+  filter((dep_delay-arr_delay)>30|dep_delay>=60)
+```
+
+7. Departed between midnight and 6am (inclusive)
+```{r}
+flights %>% 
+  filter(between(hour,0,6))
+```
+
+
