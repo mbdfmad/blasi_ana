@@ -1,0 +1,646 @@
+---
+title: "Trabajo Fundamentos Matemáticos"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+*Ana Blasi, Mónica De Santos, Ana Elósegui*
+
+En este trabajo se quiere estudiar un dataset que contiene los datos de varias campañas de marketing realizadas a clientes de un supermercado. En total se han realizado 6 campañas diferentes y se quiere analizar si existe relación entre su aceptación y las características de los clientes, sobre los cuales se ha recopilado información sobre su estado, su estilo de vida y los gastos en varios productos de los clientes. Este dataset se ha obtenido de la siguiente página, https://www.kaggle.com/rodsaldanha/arketing-campaign?select=marketing_campaign.csv, la cual también incluye la explicación de cada variable incluida en el análisis.
+
+
+
+## Preliminares y carga de datos
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse) 
+library(ggplot2)
+library(ggmosaic)
+library(haven)
+library(kernlab)
+library(nortest)
+library(corrplot)
+library(GGally)
+library(gridExtra)
+library(grid)
+```
+
+```{r message=FALSE}
+datos <- read.csv("./marketing_campaign.csv", sep = ";")
+```
+
+## Análisis exploratorio
+
+Se imprimen las primeras filas del dataset con el que se va a trabajar para poder observar las variables y sus características. 
+```{r}
+datos <- as_tibble(datos)
+head(datos, 10)
+```
+
+Se va a trabajar con 29 variables y 2240 observaciones. 
+```{r}
+dim(datos)
+```
+Se comprueba si hay datos nulos en el dataset para borrarlos si así fuera. 
+```{r}
+any(is.na(datos))
+colSums(is.na(datos))
+```
+```{r}
+datos = na.omit(datos)
+dim(datos)
+```
+
+Además, para facilitar la exploración se cambia el nombre de la columna "Response" que corresponde a la última campaña, la sexta de todas las realizadas. Por otro lado se crea una nueva, llamada "Acceptance", que resumen el total de campañas aceptadas por cada cliente. Además se reordenan las columnas para tener en primer lugar el resultado de la aceptación de las campañas.
+```{r}
+colnames(datos)[29] = "AcceptedCmp6"
+datos = datos %>% 
+  mutate(Acceptance = AcceptedCmp1 + AcceptedCmp2 + AcceptedCmp3 + AcceptedCmp4 + AcceptedCmp5 + AcceptedCmp6)
+datos = datos [, c(1, 24, 25, 21, 22, 23, 29, 30, 2:20, 26:28)]
+head(datos, 10)
+```
+
+A continuación se muestra un resumen general de las distintas variables. 
+```{r}
+summary(datos)
+```
+
+De la información obtenida cabe destacar que el máximo de "Acceptance" es 5 lo que implica que hay consumidores que aceptan la campaña en más de una ocasión (más adelante se estudiará cuantas personas aceptan en cada campaña). Además, el producto en el que más dinero se gasta es en el vino, por lo que luego se estudiará esta variable en detalle. 
+
+Se muestran el número total de campañas aceptadas por los clientes. 
+```{r}
+datos %>% 
+  count(Acceptance)
+datos %>% 
+  count(Acceptance) %>% 
+  ggplot(mapping = aes(x = Acceptance, y = n)) +
+  geom_col(fill="peachpuff", color="grey") +
+  ggtitle("Número de campañas aceptadas por los clientes")
+```
+
+La mayoría de los clientes no acepta ninguna de las promociones ofrecidas (0.727), y entre los que lo hacen, el número de ocasiones en las que las aceptan va disminuyendo. 
+
+También interesa conocer la distribución general de las variables de estudio para el tratamiento futuro de estas.
+```{r warning=FALSE, message=FALSE}
+g1 = datos %>%
+  ggplot(aes(x = Year_Birth)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g2 = datos %>%
+  ggplot(aes(x = Income)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g3 = datos %>%
+  ggplot(aes(x = MntWines)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g4 = datos %>%
+  ggplot(aes(x = MntFruits)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g5 = datos %>%
+  ggplot(aes(x = MntMeatProducts)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g6 = datos %>%
+  ggplot(aes(x = MntFishProducts)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g7 = datos %>%
+  ggplot(aes(x = MntSweetProducts)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g8 = datos %>%
+  ggplot(aes(x = MntGoldProds)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g9 = datos %>%
+  ggplot(aes(x = NumDealsPurchases)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g10 = datos %>%
+  ggplot(aes(x = NumWebPurchases)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g11 = datos %>%
+  ggplot(aes(x = NumCatalogPurchases)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g12 = datos %>%
+  ggplot(aes(x = NumStorePurchases)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+g13 = datos %>%
+  ggplot(aes(x = NumWebVisitsMonth)) +
+  geom_histogram(aes(y = stat(density)), fill= "lightskyblue2", color = "grey")
+
+
+grid.arrange(g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, g11, g12, g13, ncol = 4)
+```
+
+Según lo que se puede observar en estos gráficos de las variables numéricas, la única que sigue una distribución aparentmente normal es "Year_Birth".
+Se observa que las variables "MntFruits", "MntMeatProducts", "MntFishProducts", "MntSweetProducts", siguen una distribución aproximadamente exponencial.
+
+Por último, para acabar con el análisis general se estudia la relación que existe entre las variables numéricas. 
+```{r}
+C <- cor(datos[,c(8,9,12:14,16:27)])
+corrplot::corrplot(C, method = "circle")
+```
+
+En este gráfico se puede ver que las variables que más correlacionadas linealmente están con "Acceptance", son "MntWine" y "NumCatalogPurchases" por lo que se estudiarán por separado. 
+
+
+
+## Estudio en base a la aceptación
+
+En este apartado se busca analizar las diferencias entre las personas que han aceptado la campaña al menos una vez y las que no. Para ello se crea una nueva columna, "Acceptance_si_no", que lo indica. También, se factoriza dicha variable.
+
+Primero, se ha decidido realizar otra matriz de correlación para contrastar los datos obtenidos en la anterior y comprobar las relaciones existentes ahora que se ha generado una variable clasificatoria según si cada cliente ha aceptado alguna de las campañas o no.
+```{r}
+datos_acceptance = datos %>% 
+  mutate(Acceptance_si_no = ifelse(Acceptance==0,0,1))
+C <- cor(datos_acceptance[,c(9,12:14,16:27,31)])
+corrplot::corrplot(C, method = "circle")
+```
+
+De esta matriz de correlación obtenida se puede afirmar, que igual que se había afirmado en el análisis general, las variables que más relación guardan con la variable clasificatoria "Accepance_si_no" son "MntWines" y "NumCatalogPurchases". Además de estas dos variables también se van a analizar otras que se han considerado de interés. 
+
+Antes de comenzar con los análisis se factoriza la variable "Acceptance_si_no". 
+
+```{r}
+datos_acceptance = datos %>%
+  mutate(Acceptance_si_no = ifelse(Acceptance==0,'NO','YES'))
+datos_acceptance$Acceptance_si_no <- as_factor(datos_acceptance$Acceptance_si_no)
+```
+
+```{r}
+datos_acceptance %>% select(ID, Acceptance_si_no) %>% head()
+```
+
+
+
+#### INGRESOS
+
+Primero, se ha decidido analizar la variable Income y estudiar como afecta el salario del usuario a su compra.
+Se ha realizado un boxplot donde se podrá estudiar si hay una diferencia entre las diferentes medias de los Incomes según ha aceptado la campaña o no.
+```{r warning==FALSE}
+ggplot(datos_acceptance)+
+  geom_boxplot(aes(x=Acceptance_si_no,y=Income),fill='lightskyblue2') +
+  ggtitle("Boxplot del Income según Acceptance")
+```
+
+En el anterior boxplot se observa la existencia de unos outliers. Para continuar con el estudio se ha decidido prescendir de ellos.
+```{r}
+datos_acceptance <- datos_acceptance %>% 
+  filter(Income<6e+5)
+```
+
+
+Al realizar el boxplot por segunda vez, se observa que al haber eliminado los outliers, se reduce la escala de Income y permite analizar el resultado con mayor claridad. Se aprecia como las personas que aceptan la campaña, almenos una vez, tienen un salario mayor que las que no la han aceptado.
+```{r}
+ggplot(datos_acceptance)+
+  geom_boxplot(aes(x=Acceptance_si_no, y=Income),fill='lightskyblue2') +
+  ggtitle("Boxplot del Income según Acceptance")
+```
+
+Aun así, se ha querido comprobar si realmente existe una diferencia significativa entre las dos medias. Para ello, se ha decidido realizar un Two Sample T-test que estudia la igualdad de medias. Antes, se han creado las dos muestras segregando entre si aceptado y no. 
+```{r}
+yes_income <- datos_acceptance %>% 
+  filter(Acceptance_si_no=="YES") %>% 
+  select(Income)
+no_income <- datos_acceptance %>% 
+  filter(Acceptance_si_no=="NO") %>% 
+  select(Income)
+```
+
+Ahora, es el momento del análisis.
+
+      Hipótesis nula es H0:μsi=μno
+      
+      Hipótesis alternativa es H1:μsi≠μno
+
+```{r}
+t.test(yes_income, no_income, # dos muestras 
+        alternative = "two.sided", # contraste bilateral 
+        paired = FALSE, # muestras independientes
+        var.equal = TRUE ) 
+```
+
+Se ha obtenido el siguiente resultado:    
+
+- pvalor < 2.2e-16 
+
+Por lo tanto rechazamos la hipotesis nula, lo que significa que sí que hay una diferencia significativa entre las medias.Se confirma que las personas que sí que aceptan al menos una vez tienen significativamente un Income mayor que las que no aceptan.
+
+
+
+#### EDAD
+
+A continuación, se ha decidido estudiar como afecta la edad a la aceptación. Se ha realizado un boxplot. 
+```{r}
+ggplot(datos_acceptance)+
+  geom_boxplot(aes(x=Acceptance_si_no,y=Year_Birth),fill='lightskyblue2') +
+  ggtitle("Boxplot del año de nacimiento según Acceptance")
+```
+
+Se observan unos outliers y se ha decidido despreciarlos del dataset. 
+```{r}
+datos_acceptance = datos_acceptance %>% 
+  filter(Year_Birth>1920)
+```
+
+Se vuelve a realizar el boxplot y se estudia el resultado. Se considera que no hay diferencia entre la media de edad de las personas que aceptan y las que no. Aun así, más adelante se realizará un análisis para estudiar la significatividad de la diferencia.
+```{r}
+ggplot(datos_acceptance)+
+  geom_boxplot(aes(x=Acceptance_si_no,y=Year_Birth), fill='lightskyblue2') +
+  ggtitle("Boxplot del año de nacimiento según Acceptance")
+```
+
+Primero, se crean las muestras que se utilizarán en el Two Sample T-test. Como en el apartado anterior, también se separa entre aceptado y no aceptado. 
+```{r}
+yes_year_birth <- datos_acceptance %>% 
+  filter(Acceptance_si_no=="YES") %>% 
+  select(Year_Birth)
+no_year_birth <- datos_acceptance %>% 
+  filter(Acceptance_si_no=="NO") %>% 
+  select(Year_Birth)
+```
+
+A continuación, se efectua el analisis.
+
+      Hipótesis nula es H0:μsi=μno
+      
+      Hipótesis alternativa es H1:μsi≠μno
+
+```{r}
+t.test( yes_year_birth, no_year_birth, # dos muestras 
+        alternative = "two.sided", # contraste bilateral 
+        paired = FALSE, # muestras independientes
+        var.equal = TRUE ) 
+```
+
+Se obtiene el siguiente resultado:
+
+ - p-value > 0.05 
+
+Como ya se había comentado antes, no se rechaza la hipotesis nula y, por lo tanto, no se puede decir que, estadísticamente hablando, haya una diferencia significativa entre la edad media de aquellos que aceptan o no alguna campaña. 
+
+
+
+#### ESTADO CIVIL
+
+La siguiente variable que se estudiará es el Marital Status. Según el siguiente gráfico, no parece que haya una diferencia significativa en cuanto al estado, para aceptar la campaña o no, ya que las proporciones de esta variable en ambos casos son practicamente iguales; lo cual significa, que esta variable no sería importante a la hora de saber si una persona va a aceptar la campaña o no.
+```{r}
+datos_acceptance %>% 
+  group_by(Acceptance_si_no) %>% 
+  count(Marital_Status)
+
+tabla_marital_status <- table(datos_acceptance$Acceptance_si_no,datos_acceptance$Marital_Status)
+prop_marital = as.data.frame(prop.table(tabla_marital_status,margin = 1))
+
+ggplot(prop_marital,aes(x=Var1,y=Freq,fill=Var2)) + geom_col(color='grey', size=0.2) + 
+  scale_fill_brewer(palette="Pastel2") +
+  ggtitle("Marital Status según Acceptance")
+```
+
+Tablas de probabilidades
+```{r}
+tabla_prop <- prop.table(tabla_marital_status)
+addmargins(tabla_prop)
+```
+
+
+```{r}
+tabla_prop_1 <- prop.table(tabla_marital_status,margin = 1)
+addmargins(tabla_prop_1)
+```
+
+
+```{r}
+tabla_prop_2 <- prop.table(tabla_marital_status,margin = 2)
+addmargins(tabla_prop_2)
+```
+
+De las anteriores tablas se pueden sacar las siguientes conclusiones: la probabilidad de no aceptar ni una vez es mucho mayor que de aceptar, la probabilidad más alta que se encuentra en la primera tabla es la probabilidad de que no acepte y de que este casado: 0.2888, el estatus que más acepta la campaña en porcentaje, son las personas viudas (34% de las personas viudas aceptan)
+ 
+
+#### EDUCATION
+
+Se va a estudiar si la variable Education es significativa para saber si una persona aceptará la campaña o no.
+En el siguiente gráfico se muestra la proporción de las clases de educación de las personas, clasificado en si han aceptado la campaña o no.
+Se puede observar que las proporciones no difieren mucho las unas de las otras, en cuanto a YES y NO.
+
+```{r}
+datos_acceptance %>% 
+  group_by(Acceptance_si_no) %>% 
+  count(Education)
+
+tabla_education <- table(datos_acceptance$Acceptance_si_no,datos_acceptance$Education)
+prop_education = as.data.frame(prop.table(tabla_education,margin = 1))
+
+ggplot(prop_education,aes(x=Var1,y=Freq,fill=Var2)) + geom_col(color='grey', size=0.2) + 
+  scale_fill_brewer(palette="Pastel2") +
+  ggtitle("Education según Acceptance")
+```
+
+Tabla de probabilidades
+```{r}
+tabla_prop <- prop.table(tabla_education)
+addmargins(tabla_prop)
+```
+
+
+```{r}
+tabla_prop_1 <- prop.table(tabla_education,margin = 1)
+addmargins(tabla_prop_1)
+```
+
+
+```{r}
+tabla_prop_2 <- prop.table(tabla_education,margin = 2)
+addmargins(tabla_prop_2)
+
+```
+
+De este gráfico se puede decir que las personas que tienen un nivel básico de educación tienden a no aceptar las campañas realizadas mientras que aquellos con un nivel superior de educación, sobre todo los que tienen un master o un doctorado tienden a aceptar más las promociones ofrecidas. 
+
+
+
+#### CATÁLOGO
+
+A continuación se va a estudiar la variable de aceptación mediante las compras por catálogo. La variable "Catalog_si_no" es una transformación de la variable "NumCatalogPurchases", la cual era numérica y representaba el número de compras en catálogo por cada persona; la nueva variable es categórica e indica si esa persona ha comprado nates por catálogo o no.
+
+```{r}
+datos_acceptance = datos_acceptance %>% 
+  mutate(Catalog_si_no = ifelse(NumCatalogPurchases==0, "NO", "YES"))
+
+table_cat = table(datos_acceptance$Acceptance_si_no, datos_acceptance$Catalog_si_no)
+propt_cat = as.data.frame(prop.table(table_cat, margin=1))
+
+ggplot(propt_cat,aes(x=Var1,y=Freq,fill=Var2)) + geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2") + 
+  labs(x="Acceptance_si_no", fill="Catalog_si_no") +
+  ggtitle("Compras por catálogo según Acceptance")
+```
+
+En el gráfico anterior se puede ver que las personas que compran mediante catálogo tienden a aceptar más las campañas de marketing.
+
+
+
+#### WINE 
+
+La variable MntWine es la última variable que se estudiará en esta primera parte del proyecto. Primero, se ha decidido realizar un boxplot para visualizar si hay alguna diferencia significativa entre las diferentes medias.
+
+```{r}
+ggplot(datos_acceptance) +
+  geom_boxplot(aes(x=Acceptance_si_no, y=MntWines),fill='lightskyblue2') +
+  ggtitle("Boxplot del gasto en vino según Acceptance")
+```
+
+Según el gráfico se acepta que las personas que han aceptado almenos una vez sí que compran más vino que las personas que no acepeptan. De ahí a que la variable MntWine no sigue una distribución normal no se ha podido realizar el analisis de two sample t-test. 
+
+Antes de seguir con la segunda parte del proyecto, se ha decidido analizar la variable wine con más profundidad. Se ha querido estudiar la compra de vino en los diferentes individuos. Se estudiará la relación de la cantidad de dinero que se compra de vino con los hijos que se tengan, con Marital Status y con la educación.
+
+##### Wine con numero de hijos
+
+```{r}
+datos_hijos <- datos %>% 
+  mutate(num_hijos = Kidhome + Teenhome)
+datos_hijos$num_hijos = as_factor(datos_hijos$num_hijos)
+
+ggplot(datos_hijos) +
+  geom_boxplot(aes(x=num_hijos, y=MntWines), fill='lightskyblue2') +
+  ggtitle("Boxplot del gasto en vino según número de hijos")
+```
+
+En el gráfico anterior, se muestra la cantidad de dinero gastada en vino según los hijos que tenga cada cliente. Se puede observar que hay una clara diferencia entre estas variables. Las personas que no tienen hijos se gastan en media una cantidad mucho más elevada que aquellas personas que sí tienen hijos, y según el número de hijos, el dinero gastado en vino va disminuyendo. Existen casos aislados en personas que sí que tienen hijos, y que gastan casi tanto dinero como aquellas personas sin hijos, pero no es la norma ni entra dentro del rango intercuantílico.
+
+Se va a  para estudiar el ajuste de un modelo lineal para predecir el gasto en vino mediante el número de hijos, para observar cuales son las variables significativas: 
+```{r}
+(medias = aggregate(MntWines ~ num_hijos, datos_hijos, FUN = mean)[,2])
+c(medias[1], medias[2] - medias[1], medias[3] - medias[1])
+
+modelo <- lm(MntWines ~ num_hijos, data =  datos_hijos)
+(coefs <- modelo$coefficients)
+(sumModelo = summary(modelo))
+```
+Se verifica que todas las variables son significativas y que si que afecta el número de hijos a la compra de vino.
+
+
+##### Wine con estado civil
+
+En el siguiente gráfico se tiene la cantidad de dinero gastado en vino según el Marital Status.
+Se aprecia que la media más alta es para las clases Absurd y YOLO, que aunque presenten pocas observaciones, todas ellas apuntan a tener un gasto elevado en vino.
+Del resto de clases, las personas viudas son las que de media gastan más en vino también. El resto de clases presentan medias más bajas, aunque en todas ellas existen numerosos outliers, que indica que no sn casos aislados sino que es frecuente que en estas clases también se gaste más en vino, incluso más que aquellas personas que tienen como Marital Status "YOLO" y "Absurd".
+```{r}
+ggplot(datos) +
+  geom_boxplot(aes(x=Marital_Status,y=MntWines), fill='lightskyblue2') +
+  ggtitle("Boxplot del gasto en vino según Marital Status")
+```
+
+##### Wine con educación
+
+El siguiente gráfico muestra la cantidad de dinero gastada en vino, según el nivel educacional de las personas. 
+Aquellas que tienen menor nivel de educación, son las que en media menos gastan en vino. 
+En media, los que más gastan son aquellos de mayor nivel educacional, aunque existen casos de elevado gasto también en personas graduadas y con máster.
+Podriamos extraer como conclusion, que a mayor nivel de educación, mayor gasto en vino. Esto puede deberse a tener salarios má altos según más estudios, y que esto derive en poder gastar más dinero en vino.
+
+```{r}
+ggplot(datos) +
+  geom_boxplot(aes(x=Education,y=MntWines), fill='lightskyblue2') +
+  ggtitle("Boxplot del gasto en vino según la educación")
+```
+
+
+
+## Estudio en base a la primera campaña aceptada
+
+En el apartado anterior se han analizado las relaciones y las diferencias existentes entre aquellos clientes que aceptan alguna de las campañas y aquellos que no lo hacen en ninguna ocasión. Asimismo, en este apartado se quieren estudiar las características de aquellos clientes que aceptan por primera vez las promociones ofrecidas en la misma campaña.
+
+Se crea una columna, llamada "AcceptCmp" que almacena el dato del número de campaña en el que ha aceptado cada cosnumidor por primera vez, 0 en caso de no haberla aceptado en ninguna ocasión. 
+```{r}
+datos_acceptcmp = datos[,-1]
+
+AcceptCmp = c(0)
+datos_acceptcmp = cbind(datos_acceptcmp, AcceptCmp)
+
+
+for (i in 1:nrow(datos_acceptcmp)){
+  for (j in 1:6){
+    if (datos_acceptcmp[i,j]==1 & datos_acceptcmp[i,30]==0){
+      datos_acceptcmp$AcceptCmp[i]=j
+    }
+  }
+}
+
+datos_acceptcmp = datos_acceptcmp %>% 
+  filter(Year_Birth>1920) %>% 
+  filter(Income<6e+5)
+  
+datos_acceptcmp %>% 
+  select(AcceptCmp) %>% 
+  head()
+```
+
+A continuación se seleccionan únicamente las observaciones de aquellos clientes que han aceptado alguna de las campañas y se muestra cuantas personas lo hacen en cada una de las ocasiones. 
+```{r}
+datos_acceptcmp = datos_acceptcmp %>% 
+  select(c(1:30)) %>% 
+  filter(AcceptCmp>0)
+```
+
+```{r}
+datos_acceptcmp = datos_acceptcmp %>% 
+  mutate(AcceptCmp=factor(AcceptCmp))
+datos_acceptcmp %>% 
+  count(AcceptCmp)
+```
+
+Como se puede observar en esta tabla, la mayoría de clientes han aceptado por primera vez en las campañas 1, 3 y 6, siendo esta última la mayoritaria de las estudiadas. 
+
+A continuación se van a estudiar diferentes características de los clientes para ver si estas tienen relación con la primera campaña que aceptan. 
+
+
+
+#### MEDIA DE EDAD
+```{r}
+datos_acceptcmp %>%
+  group_by(AcceptCmp) %>% 
+  summarise(media_edad = mean((2021-Year_Birth))) %>% 
+  ggplot(aes(x=AcceptCmp, y=media_edad)) +
+  geom_col(color="grey", fill="lightskyblue2") +
+  ggtitle("Edad de las personas según momento de aceptación")
+```
+
+En este gráfico se puede apreciar que no hay mucha diferencia entre la edad de las personas que aceptan en las diferentes campañas. 
+No parece ser significativa la edad para estudiar en qué momento se acepta la campaña.
+
+
+
+#### EDUCACIÓN
+```{r}
+table_educ = table(datos_acceptcmp$AcceptCmp, datos_acceptcmp$Education)
+propt_educ = as.data.frame(prop.table(table_educ, margin=1))
+
+ggplot(propt_educ,aes(x=Var1,y=Freq,fill=Var2)) + geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2") +
+  ggtitle("Educación según momento de aceptación")
+```
+
+De este gráfico se puede concluir que la educación no es una variable que afecte mucho a la hora de decidir por primera vez aceptar una campaña, aunque sí que hay que mencionar la cantidad de clientes de PhD que aceptan por primera vez en la segunda campaña, que además es la campaña en la que menos clientes han aceptado las promociones ofrecidas, como se ha visto antes. 
+
+
+
+#### ESTADO CIVIL
+```{r}
+table_marit = table(datos_acceptcmp$AcceptCmp, datos_acceptcmp$Marital_Status)
+propt_marit = as.data.frame(prop.table(table_marit, margin=1))
+
+ggplot(propt_marit,aes(x=Var1,y=Freq,fill=Var2)) + geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2") +
+  ggtitle("Marital Status según momento de aceptación")
+```
+
+Como muestra el gráfico, los clientes que tienen pareja representan más de la mitad de los clientes que aceptan por primera vez en la segunda campaña. Además, los divorciados, aceptan más las promociones en la segunda y en la sexta campaña, y por otro lado los solteros lo hacen más en la última ocasión. 
+
+
+
+#### INGRESOS
+```{r}
+hist(datos_acceptcmp$Income, col='lightskyblue2', main = "Histograma de Income")
+```
+
+Para estudiar esta variable se ha decidido agrupar los ingresos en tres niveles para facilitar el análisis según este datos de los clientes. 
+```{r}
+datos_acceptcmp = datos_acceptcmp %>% 
+  mutate(level_income = ifelse(Income>0 & Income<40000, "Low", ifelse(Income>40000 & Income>80000, "Medium", "High")))
+```
+
+```{r}
+table_inc = table(datos_acceptcmp$AcceptCmp, datos_acceptcmp$level_income)
+propt_inc = as.data.frame(prop.table(table_inc, margin=1))
+
+ggplot(propt_inc,aes(x=Var1,y=Freq,fill=Var2)) + geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2") +
+  ggtitle("Income según momento de aceptación")
+```
+
+En este caso si que existe una clara diferencia en el comportamiento de los clientes con diferentes ingresos. Según la información representada los clientes con un nivel de ingresos bajo aceptan generalmente en las campañas 3 y 6, mientras que los de ingresos medios lo hacen más en la 1 y en la 5, y los de ingresos altos tienen más probabilidad de aceptar las campañas 2 y 4. 
+
+
+
+#### GASTOS EN CATEGORÍAS DE PRODUCTOS
+
+Se quiere estudiar la cantidad de productos de cada categoría en los que gastan los clientes y si existe relación con la primera campaña que aceptan. Para ello, por cada categoría se ha calculado la media de los gastos en cada una. 
+```{r}
+datos_acceptcmp_mnt = datos_acceptcmp %>% 
+  select(AcceptCmp, MntWines, MntFruits, MntMeatProducts, MntFishProducts, MntSweetProducts, MntGoldProds) %>% 
+  group_by(AcceptCmp) %>% 
+  summarise(media_vino = mean(MntWines), media_fruta=mean(MntFruits), media_carne=mean(MntMeatProducts), media_pescado=mean(MntFishProducts), media_dulces=mean(MntSweetProducts), media_gold=mean(MntGoldProds))
+
+
+gg_vino = ggplot(datos_acceptcmp_mnt, aes(x=AcceptCmp, y=media_vino, fill=AcceptCmp)) +
+  geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2")
+gg_fruta = ggplot(datos_acceptcmp_mnt, aes(x=AcceptCmp, y=media_fruta, fill=AcceptCmp)) +
+  geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2")
+gg_carne = ggplot(datos_acceptcmp_mnt, aes(x=AcceptCmp, y=media_carne, fill=AcceptCmp)) +
+  geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2")
+gg_pescado = ggplot(datos_acceptcmp_mnt, aes(x=AcceptCmp, y=media_pescado, fill=AcceptCmp)) +
+  geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2")
+gg_dulces = ggplot(datos_acceptcmp_mnt, aes(x=AcceptCmp, y=media_dulces, fill=AcceptCmp)) +
+  geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2")
+gg_gold = ggplot(datos_acceptcmp_mnt, aes(x=AcceptCmp, y=media_gold, fill=AcceptCmp)) +
+  geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2")
+
+grid.arrange(gg_vino, gg_fruta, gg_carne, gg_pescado, gg_dulces, gg_gold, ncol = 2)
+```
+
+En los gráficos anteriores se puede observar que el producto en el que más dinero gastan todos los clientes que aceptan en alguna ocasión la campaña de marketing es en vino. Los clientes que aceptan la campaña en la primera ocasión aparentemente gastan más que la media en fruta, en pescado y en dulces. Los clientes que aceptan la campaña a la segunda gastan mucho en vino y en productos gold. Y finalmente los clientes que aceptan la campaña en la quinta campaña gastan más de media que los demás clientes en todos los productos excepto en vino y en gold.
+
+#### COMPRAS POR CATÁLOGO
+Por último, como en el análisis general se ha visto que la decisión de aceptar la campaña o no está relacionada con el número de compras por catálogo, se va a estudiar esta relación. 
+```{r}
+datos_acceptcmp = datos_acceptcmp %>% 
+  mutate(Catalog_si_no = ifelse(NumCatalogPurchases==0, "NO", "YES"))
+
+table_cat = table(datos_acceptcmp$AcceptCmp, datos_acceptcmp$Catalog_si_no)
+propt_cat = as.data.frame(prop.table(table_cat, margin=2))
+
+ggplot(propt_cat,aes(x=Var1,y=Freq,fill=Var2)) + geom_col(color="grey") + 
+  scale_fill_brewer(palette="Pastel2") +
+  ggtitle("Compras por catálogo según momento de aceptación")
+```
+
+Se puede apreciar en este gráfico que todas las personas que aceptan en la primera y quinta campaña por primera vez compran mediante catálogo.
+
+## CONCLUSIONES
+- Tras realizar una nueva variable que defina cuando las personas no aceptan vs cuando las personas aceptan mas de una vez, se ha estudiado como afecta a algunas variables del dataset.
+
+- Se ha observado que las personas con mayor Income aceptan más que las personas que no aceptan. 
+
+- En cuanto a la edad, se ha utilizado el metodo two sample-t para confirmar que no hay una diferencia significativa que entre las diferentes edades segun si aceptan o no.
+
+- Sobre la variable del estado civil con la variable de aceptación, se ha observado que la probabilidad más alta que se encuentra es la probabilidad de que no acepte y de que este casado. También se ha observado que el estatus que más acepta la campaña en porcentaje, son las personas viudas.
+
+- Las personas que compran mediante catálogo tienden a aceptar más las campañas de marketing
+
+- Además, se conluye que las personas que tienen un nivel básico de educación tienden a no aceptar las campañas realizadas mientras que aquellos con un nivel superior de educación, sobre todo los que tienen un master o un doctorado tienden a aceptar más las promociones ofrecidas. 
+
+- Despues de estudiar la variable wine con más profundidad se observa que las personas que han aceptado almenos una vez sí que compran más vino que las personas que no acepeptan. También se han estudiado como afectan las varibles de número de hijos, estado civil y educacion con wine.
+
+-  En la segunda parte del proyecto, se ha realizado un estudio más especifico según el momento de la aceptación.
+
+- Las campañas más populares para aceptar por primera vez son la primera, la tercera y la sexta. 
+
+- Además, los clientes con mayor nivel de ingresos aceptan más en la segunda campaña, los de nivel medio en la quinta y los de nivel bajo en la tercera y en la sexta.
+
+- La edad y el nivel de educación no varían mucho entre las personas que aceptan alguna de las campañas de marketing. 
+
+- Las personas emparejadas tienden a aceptar más la segunda campaña mientras que las solteras aceptan más en la última campaña.
+
+- Los clientes con mayor nivel de ingresos aceptan más en la segunda campaña, los de nivel medio en la quinta y los de nivel bajo en la tercera y en la sexta. 
+
+- Las personas que más gastan de media en vino son las que aceptan por primera vez en la segunda campaña, las que más gastan en fruta, en carne y en dulces en la quinta. Además los que más gastan en pescado y en productos gold son las que aceptan en la primera.
+
+- Como se ha visto en el análisis exploratorio las variables "Acceptance" y "NumCatalogPurchases" están correlaciones y se ha podido comprobar que todos los clientes que aceptan por primera vez en la primera y en la quinta campaña han comprado alguna vez mediante catálogo.
+
+
